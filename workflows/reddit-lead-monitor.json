@@ -1,0 +1,1153 @@
+{
+  "name": "Reddit Lead Monitor (HTTP)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reddit-done",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3424,
+        976
+      ],
+      "id": "ba99d8c9-ebc2-4f1d-94c2-bef0ce8debfc",
+      "name": "Webhook",
+      "webhookId": "30ad5217-f764-47b0-ab1a-1a2ae69d4014"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\n\n// Slack's one-time URL verification handshake (JSON body, Events API only)\nif (body.type === 'url_verification') {\n  return [{\n    json: {\n      is_challenge: true,\n      challenge: body.challenge\n    }\n  }];\n}\n\n// Button clicks (block_actions) come as form-urlencoded with a JSON string in `payload`\nif (body.payload) {\n  let parsedPayload;\n  try {\n    parsedPayload = JSON.parse(body.payload);\n  } catch (e) {\n    parsedPayload = null;\n  }\n\n  return [{\n    json: {\n      is_challenge: false,\n      payload: parsedPayload\n    }\n  }];\n}\n\n// Fallback for anything else (e.g. Events API notifications)\nreturn [{\n  json: {\n    is_challenge: false,\n    event: body.event || {}\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3152,
+        944
+      ],
+      "id": "d01fa2bb-e119-42cc-a68f-673dc2d5b88a",
+      "name": "Handle Slack Verification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.is_challenge }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2896,
+        944
+      ],
+      "id": "e1df8b04-df18-424e-862c-9f3392b82770",
+      "name": "Is Challenge?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"challenge\": $json.challenge } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -2656,
+        832
+      ],
+      "id": "1bbc5d11-ad2c-4fad-9814-f52c9f7a3c29",
+      "name": "Respond With Challenge"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -2672,
+        1232
+      ],
+      "id": "50ed71cc-fa0b-47d3-837a-1171499e3af1",
+      "name": "Acknowledge Slack Event"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.payload;\n\nif (!payload || !payload.actions || !payload.actions[0]) {\n  return [{ json: { valid: false } }];\n}\n\nconst action = payload.actions[0];\n\nreturn [{\n  json: {\n    valid: true,\n    action_id: action.action_id,\n    value: action.value,\n    response_url: payload.response_url,\n    user: payload.user ? payload.user.username : 'someone'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2592,
+        1072
+      ],
+      "id": "b1576f1c-be63-4520-a9cb-49da59a32703",
+      "name": "Parse Button Click"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.response_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replace_original\": true,\n  \"text\": \"✅ Done — marked by {{ $json.user }}\\n{{ $json.value }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -2368,
+        1072
+      ],
+      "id": "d98a2062-68b9-4089-b208-439523a3e4d7",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hzhfPxtgC39pl4uc",
+          "name": "Reddit bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "f939631f-ee01-45cc-b8f5-51e1ad395e0f",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3392,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/smallbusiness/new.rss",
+        "options": {}
+      },
+      "id": "fb79e79f-c8be-40fc-9e61-46daefb3ac32",
+      "name": "RSS - r/smallbusiness",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -3152,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/forhire/new.rss",
+        "options": {}
+      },
+      "id": "9fab5e4b-3af8-478f-b5d9-2155cb241eb4",
+      "name": "RSS - r/forhire",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -2768,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/ecommerce/new.rss",
+        "options": {}
+      },
+      "id": "e2290b57-0e0e-49fd-891b-3ece0ac504b4",
+      "name": "RSS - r/ecommerce",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -1552,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/shopify/new.rss",
+        "options": {}
+      },
+      "id": "25c1bcb1-566a-4d61-861b-51b696452aee",
+      "name": "RSS - r/shopify",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -1136,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/dropship/new.rss",
+        "options": {}
+      },
+      "id": "2cbca2e6-f414-413b-ac5a-9cda3b6e33a6",
+      "name": "RSS - r/dropship",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/realestateinvesting/new.rss",
+        "options": {}
+      },
+      "id": "f063c427-6a60-469f-b4b6-8419622ea875",
+      "name": "RSS - r/realestateinvesting",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/agency/new.rss",
+        "options": {}
+      },
+      "id": "62c88e0f-769d-47c4-8a0a-31b33e35f965",
+      "name": "RSS - r/agency",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        48,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/consulting/new.rss",
+        "options": {}
+      },
+      "id": "6ddb3cdb-d14b-499c-8dde-3ecb06129ea0",
+      "name": "RSS - r/consulting",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        448,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/business/new.rss",
+        "options": {}
+      },
+      "id": "a89b9b80-f639-4e7f-a916-41116b5eed3c",
+      "name": "RSS - r/business",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        736,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2928,
+        304
+      ],
+      "id": "81bd37bf-6dd0-43c6-9b19-1b5c7de75d3e",
+      "name": "Wait1",
+      "webhookId": "51c6fcac-d2d2-4c9a-ab95-165302053c68"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2528,
+        288
+      ],
+      "id": "64c0fcd3-601f-4d4c-b724-96008c48f9ea",
+      "name": "Wait2",
+      "webhookId": "15aa491d-9e3d-4fc3-bb3e-8fb9e58a2c04"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        272,
+        176
+      ],
+      "id": "eba8394d-7f33-4ccc-a929-212c94e473fc",
+      "name": "Wait9",
+      "webhookId": "7fc57eb7-9bd0-a8e0-02af-7b1968619041"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You're screening Reddit posts for someone who does freelance n8n automation work (CRM integrations, Slack workflows, Voice AI, backend/API automation). They want to find businesses/people they could PITCH automation to, even if the poster never mentions automation themselves.\n\nPost title: {{ $json.title }}\nPost content: {{ $json.content }}\n\nMark relevant if the post describes ANY of the following, regardless of whether they ask for automation help directly:\n- A manual, repetitive, or time-consuming process in their business (data entry, scheduling, follow-ups, invoicing, customer replies, etc.)\n- A business owner venting about something taking too much time or being error-prone\n- A workflow, task, or process that sounds like it could realistically be automated, even if they're just describing the problem, not asking for a solution\n- Someone explicitly asking for automation help or recommendations\n- A hiring/freelance post looking for someone to build automation\n\nMark NOT relevant if the post is:\n- Another automation builder/freelancer sharing their own tips, lessons, or a workflow they built (peer content, not a lead)\n- A general discussion or opinion piece with no specific business problem described\n- Someone showcasing their own tool, product, or project\n- Someone looking for a JOB or seeking employment (not a business with a problem)\n- Purely personal/emotional content with no business process mentioned\n- Too vague to identify any specific repetitive task or process\n\nReply with ONLY valid JSON, no other text:\n{\"relevant\": true or false, \"reason\": \"one short sentence describing the specific process/problem that could be pitched, or why it doesn't qualify\"}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2080,
+        352
+      ],
+      "id": "ca6fdba8-28c1-4e02-af82-458441c79c63",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const feedNodeNames = [\n  'RSS - r/smallbusiness',\n  'RSS - r/forhire',\n  'RSS - r/nocode1',\n  'RSS - r/Entrepreneur1',\n  'RSS - r/ecommerce',\n  'RSS - r/shopify',\n  'RSS - r/dropship',\n  'RSS - r/realestateinvesting',\n  'RSS - r/agency',\n  'RSS - r/consulting',\n  'RSS - r/business',\n  'Code in JavaScript'\n];\n\nconst maxAgeHours = 6.5;\nconst cutoff = Date.now() - (maxAgeHours * 60 * 60 * 1000);\n\nconst results = [];\n\nfor (const nodeName of feedNodeNames) {\n  let feedItems;\n  try {\n    feedItems = $(nodeName).all();\n  } catch (e) {\n    continue;\n  }\n\n  for (const item of feedItems) {\n    const pubDate = new Date(item.json.pubDate).getTime();\n    if (pubDate <= cutoff) continue;\n\n    results.push({\n      json: {\n        title: item.json.title,\n        link: item.json.link,\n        pubDate: item.json.pubDate,\n        author: item.json.author,\n        content: item.json.content,\n        subreddit: nodeName\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        384
+      ],
+      "id": "21b6b2cc-5600-4641-a4e6-219ca49ed628",
+      "name": "Merge everything"
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = [\n  'automate', 'automation', 'n8n', 'workflow', 'manual', 'repetitive',\n  'integration', 'crm', 'hiring', 'time-consuming', 'time consuming',\n  'tedious', 'busywork', 'spreadsheet', 'excel', 'data entry',\n  'follow up', 'follow-up', 'scheduling', 'invoicing', 'admin',\n  'process', 'task', 'inefficient', 'slow', 'overwhelmed', 'drowning'\n];\nreturn items.filter(item => {\n  const title = (item.json.title || '').toLowerCase();\n  return keywords.some(kw => title.includes(kw));\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        384
+      ],
+      "id": "72fe1245-e0f7-4236-b100-30bc501d7191",
+      "name": "Filter all data"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "2Xg0NJG7BU005xGq",
+          "mode": "list",
+          "cachedResultName": "Reddit Data",
+          "cachedResultUrl": "/projects/oIxh4SUEz8boCFzl/datatables/2Xg0NJG7BU005xGq"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "link",
+              "condition": "=eq",
+              "keyValue": "={{ $json.link }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        384
+      ],
+      "id": "fab50c05-3029-463d-a2ea-6425c34d64aa",
+      "name": "Check If Seen",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ Object.keys($json).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "id": "a9bd9dc7-0f42-4822-92c6-77ce18c92508"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        384
+      ],
+      "id": "ef66525d-81e7-46fb-96e4-12474e5f475e",
+      "name": "Is New?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  let cleanContent =  $('Filter all data').first().json.content|| '';\n  cleanContent = cleanContent.replace(/<[^>]*>/g, ' ');\n  cleanContent = cleanContent.replace(/\\s+/g, ' ').trim();\n  cleanContent = cleanContent.substring(0, 500);\n\n  return {\n    json: {\n      ...item.json,\n      content: cleanContent\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        352
+      ],
+      "id": "bcca237a-c54c-4257-96e7-b605dd4b585f",
+      "name": "Make it so AI can read this"
+    },
+    {
+      "parameters": {
+        "jsCode": "const originalItems = $('Filter all data').all();\n\nconst results = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const aiItem = items[i];\n  const originalItem = originalItems[i];\n\n  if (!originalItem) continue;\n\n  let parsed;\n  try {\n    let rawText = aiItem.json.output[0].content[0].text;\n    rawText = rawText.replace(/```json\\s*/i, '').replace(/```\\s*$/, '').trim();\n    parsed = JSON.parse(rawText);\n  } catch (e) {\n    continue;\n  }\n\n  if (parsed.relevant === true) {\n    results.push({\n      json: {\n        title: originalItem.json.title,\n        link: originalItem.json.link,\n        pubDate: originalItem.json.pubDate,\n        subreddit: originalItem.json.subreddit,\n        reason: parsed.reason\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        176
+      ],
+      "id": "8143af52-7bc4-432d-83fa-4348fe7cef41",
+      "name": "Parse from ai"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"C0C17LMCMSS\",\n  \"blocks\": [\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"🔔 *{{ $json.title }}*\\n\\n<{{ $json.link }}|View on Reddit>\\n\\n*Subreddit:* {{ $json.subreddit }}\\n*Why it matched:* {{ $json.reason }}\"\n      }\n    },\n    {\n      \"type\": \"actions\",\n      \"elements\": [\n        {\n          \"type\": \"button\",\n          \"text\": {\n            \"type\": \"plain_text\",\n            \"text\": \"✅ Mark Done\"\n          },\n          \"action_id\": \"mark_done\",\n          \"value\": \"{{ $json.link }}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        208
+      ],
+      "id": "74a1d903-d946-4a12-937f-738973fe75ec",
+      "name": "Send slack message",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hzhfPxtgC39pl4uc",
+          "name": "Reddit bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "2Xg0NJG7BU005xGq",
+          "mode": "list",
+          "cachedResultName": "Reddit Data",
+          "cachedResultUrl": "/projects/oIxh4SUEz8boCFzl/datatables/2Xg0NJG7BU005xGq"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "link": "={{ $('Parse from ai').item.json.link }}",
+            "title": "={{ $('Parse from ai').item.json.title }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        3296,
+        144
+      ],
+      "id": "25486448-604b-4b00-8b0d-b731ca1352a2",
+      "name": "Mark As Seen"
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/nocode/new.rss",
+        "options": {}
+      },
+      "id": "853b8a7f-27af-494d-96d7-03982e2378c5",
+      "name": "RSS - r/nocode1",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -2352,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/Entrepreneur/new.rss",
+        "options": {}
+      },
+      "id": "a9de68be-cccc-4b39-850c-bac43e836b55",
+      "name": "RSS - r/Entrepreneur1",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        -1952,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2128,
+        272
+      ],
+      "id": "e257d0e8-61c5-4051-b67d-898d270a21a7",
+      "name": "Wait",
+      "webhookId": "1fc918b1-35da-428b-a6a9-8b74e6fd6aeb"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1728,
+        256
+      ],
+      "id": "5322f19e-ae54-4778-9677-7279aaf5f3cf",
+      "name": "Wait10",
+      "webhookId": "2ad029c2-46eb-539b-b7ba-276413164bfc"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1328,
+        240
+      ],
+      "id": "774df593-5b17-465f-ad31-4427dcacc0fd",
+      "name": "Wait11",
+      "webhookId": "3be13ad3-57fc-64ac-c8cb-387524275c0d"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -928,
+        224
+      ],
+      "id": "62ec4101-ca6c-4cf9-b335-aeaa34009c5d",
+      "name": "Wait12",
+      "webhookId": "4cf24be4-68ad-75bd-d9dc-498635386d1e"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        208
+      ],
+      "id": "7db0060f-0881-4436-82a1-a964c2a0869d",
+      "name": "Wait13",
+      "webhookId": "5da35cf5-79be-86ce-e0ed-5a9746497e2f"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -128,
+        192
+      ],
+      "id": "e35c6c6f-f1f0-4c99-99cb-ec3943c7d8d1",
+      "name": "Wait14",
+      "webhookId": "6eb46da6-8acf-97df-f1fe-6a0857508f30"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        576,
+        160
+      ],
+      "id": "6593ca1d-1bb1-4235-b71b-a3a4ff62fc91",
+      "name": "Wait15",
+      "webhookId": "64325940-99de-4dbd-940b-afdd0bd4f284"
+    },
+    {
+      "parameters": {
+        "jsCode": "const maxAgeHours = 12.5;\nconst cutoff = Math.floor(Date.now() / 1000) - (maxAgeHours * 60 * 60);\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: 'https://hn.algolia.com/api/v1/search_by_date',\n  qs: {\n    tags: 'story',\n    numericFilters: `created_at_i>${cutoff}`,\n    hitsPerPage: 100\n  },\n  json: true\n});\n\nconst results = [];\n\nfor (const item of response.hits) {\n  if (!item.title) continue;\n\n  results.push({\n    json: {\n      title: item.title,\n      link: `https://news.ycombinator.com/item?id=${item.objectID}`,\n      pubDate: new Date(item.created_at_i * 1000).toISOString(),\n      author: item.author || 'unknown',\n      content: item.story_text || '',\n      subreddit: 'Hacker News'\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        736
+      ],
+      "id": "2be205b6-5a1b-466e-8587-68cd9b05daff",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "connections": {
+    "Handle Slack Verification": {
+      "main": [
+        [
+          {
+            "node": "Is Challenge?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Challenge?": {
+      "main": [
+        [
+          {
+            "node": "Respond With Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acknowledge Slack Event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Button Click",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Handle Slack Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Button Click": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/smallbusiness",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/smallbusiness": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/forhire": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/ecommerce": {
+      "main": [
+        [
+          {
+            "node": "Wait11",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/shopify": {
+      "main": [
+        [
+          {
+            "node": "Wait12",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/dropship": {
+      "main": [
+        [
+          {
+            "node": "Wait13",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/realestateinvesting": {
+      "main": [
+        [
+          {
+            "node": "Wait14",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/agency": {
+      "main": [
+        [
+          {
+            "node": "Wait9",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/consulting": {
+      "main": [
+        [
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/business": {
+      "main": [
+        [
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/forhire",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/nocode1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait9": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/consulting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Parse from ai",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge everything": {
+      "main": [
+        [
+          {
+            "node": "Filter all data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter all data": {
+      "main": [
+        [
+          {
+            "node": "Check If Seen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Seen": {
+      "main": [
+        [
+          {
+            "node": "Is New?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New?": {
+      "main": [
+        [
+          {
+            "node": "Make it so AI can read this",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make it so AI can read this": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse from ai": {
+      "main": [
+        [
+          {
+            "node": "Send slack message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send slack message": {
+      "main": [
+        [
+          {
+            "node": "Mark As Seen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/nocode1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - r/Entrepreneur1": {
+      "main": [
+        [
+          {
+            "node": "Wait10",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/Entrepreneur1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait10": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/ecommerce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait11": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/shopify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait12": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/dropship",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait13": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/realestateinvesting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait14": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/agency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait15": {
+      "main": [
+        [
+          {
+            "node": "RSS - r/business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}
